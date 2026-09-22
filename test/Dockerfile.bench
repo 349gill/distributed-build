@@ -1,0 +1,4 @@
+# Benchmark client: the distbuild image (same gcc as the workers, plus the client) with python and git.
+FROM distbuild:latest
+RUN apt-get update && apt-get install -y --no-install-recommends python3 git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*

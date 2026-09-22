@@ -31,3 +31,9 @@ go.work.sum
 # .idea/
 # .vscode/
 .DS_Store
+
+# Project binaries and build artifacts
+bin/
+build/
+test/linux/
+*.log
