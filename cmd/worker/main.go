@@ -30,6 +30,71 @@ var droppedStandaloneFlags = map[string]bool{"-c": true, "-E": true, "-M": true,
 // cores only adds context switching; the rest queue on this token instead.
 var slots chan struct{}
 
+func isSafeParam(val string) bool {
+	if val == "" {
+		return false
+	}
+	for _, r := range val {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-' || r == '+' || r == '=' || r == '.') {
+			return false
+		}
+	}
+	return true
+}
+
+func isSafeFlag(arg string) bool {
+	if !strings.HasPrefix(arg, "-") {
+		return false
+	}
+
+	switch arg {
+	case "-W", "-O", "-O0", "-O1", "-O2", "-O3", "-Os", "-Ofast", "-Og", "-Oz",
+		"-g", "-g0", "-g1", "-g2", "-g3", "-ggdb",
+		"-pipe", "-pthreads", "-pthread",
+		"-fPIC", "-fpic", "-fPIE", "-fpie",
+		"-fno-strict-aliasing", "-ffast-math",
+		"-fstack-protector", "-fstack-protector-strong", "-fstack-protector-all", "-fno-stack-protector",
+		"-fomit-frame-pointer", "-fno-omit-frame-pointer",
+		"-fexceptions", "-fno-exceptions",
+		"-frtti", "-fno-rtti",
+		"-fdata-sections", "-ffunction-sections",
+		"-flto", "-fno-lto",
+		"-funsigned-char", "-fsigned-char",
+		"-fwrapv", "-fno-wrapv",
+		"-fcommon", "-fno-common",
+		"-fmath-errno", "-fno-math-errno",
+		"-m32", "-m64":
+		return true
+	}
+
+	if strings.HasPrefix(arg, "-std=") {
+		return isSafeParam(arg[len("-std="):])
+	}
+	if strings.HasPrefix(arg, "-march=") {
+		return isSafeParam(arg[len("-march="):])
+	}
+	if strings.HasPrefix(arg, "-mtune=") {
+		return isSafeParam(arg[len("-mtune="):])
+	}
+	if strings.HasPrefix(arg, "-mcpu=") {
+		return isSafeParam(arg[len("-mcpu="):])
+	}
+	if strings.HasPrefix(arg, "-fvisibility=") {
+		return isSafeParam(arg[len("-fvisibility="):])
+	}
+	if strings.HasPrefix(arg, "-m") && !strings.Contains(arg, "=") {
+		return isSafeParam(arg[len("-m"):])
+	}
+	if strings.HasPrefix(arg, "-W") {
+		if strings.HasPrefix(arg, "-Wl,") || strings.HasPrefix(arg, "-Wp,") || strings.HasPrefix(arg, "-Wa,") {
+			return false
+		}
+		return isSafeParam(arg[len("-W"):])
+	}
+
+	return false
+}
+
 func parseFlags(header string) ([]string, error) {
 	if header == "" {
 		return nil, nil
@@ -51,6 +116,9 @@ func parseFlags(header string) ([]string, error) {
 		}
 		if strings.HasPrefix(arg, "-I") || strings.HasPrefix(arg, "-D") || strings.HasPrefix(arg, "-U") {
 			continue // joined form, e.g. -DFOO=1
+		}
+		if !isSafeFlag(arg) {
+			return nil, fmt.Errorf("disallowed or unsafe compile flag: %s", arg)
 		}
 		flags = append(flags, arg)
 	}
